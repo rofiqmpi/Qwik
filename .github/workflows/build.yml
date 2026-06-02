@@ -47,12 +47,30 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Generate missing Gradle wrapper files
+        run: |
+          if [ ! -f android/gradlew ]; then
+            echo "gradlew not found — generating via flutter create..."
+            flutter create \
+              --project-name temp \
+              --org com.temp \
+              --platforms android \
+              /tmp/flutter_gen
+            cp /tmp/flutter_gen/android/gradlew           android/gradlew
+            cp /tmp/flutter_gen/android/gradle/wrapper/gradle-wrapper.jar \
+               android/gradle/wrapper/gradle-wrapper.jar
+            chmod +x android/gradlew
+            echo "✅ Gradle wrapper generated"
+          else
+            echo "gradlew already exists ✅"
+          fi
+          ls -lh android/gradlew android/gradle/wrapper/
+
       - name: Write android/local.properties
         run: |
-          FLUTTER_ROOT=$(flutter --version --machine 2>/dev/null \
+          echo "flutter.sdk=$(flutter --version --machine 2>/dev/null \
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['flutterRoot'])" 2>/dev/null \
-            || dirname $(dirname $(which flutter)))
-          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+            || dirname $(dirname $(which flutter)))" > android/local.properties
           echo "sdk.dir=$ANDROID_HOME" >> android/local.properties
           cat android/local.properties
 
@@ -86,10 +104,10 @@ jobs:
             ## 📲 Qwik — Android Release Build ${{ github.run_number }}
 
             ### ⬇️ ডাউনলোড করুন
-            **[qwik-release.apk](https://github.com/rofiqmpi/Qwik/releases/latest/download/qwik-release.apk)** — সরাসরি Android ফোনে ইনস্টল করুন
+            **`qwik-release.apk`** — সরাসরি Android ফোনে ইনস্টল করুন
 
             ### 📱 ইনস্টল করার নিয়ম
-            1. উপরের লিঙ্ক থেকে `qwik-release.apk` ডাউনলোড করুন
+            1. নিচে থেকে `qwik-release.apk` ডাউনলোড করুন
             2. ফোনে **Settings → Security → Unknown sources** চালু করুন
             3. ডাউনলোড করা ফাইল খুলুন → **Install** করুন
 
