@@ -22,14 +22,6 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
-def keyProperties = new Properties()
-def keyPropertiesFile = rootProject.file('key.properties')
-if (keyPropertiesFile.exists()) {
-    keyPropertiesFile.withReader('UTF-8') { reader ->
-        keyProperties.load(reader)
-    }
-}
-
 android {
     namespace "com.qwik.app"
     compileSdk 34
@@ -48,15 +40,6 @@ android {
         main.java.srcDirs += 'src/main/kotlin'
     }
 
-    signingConfigs {
-        release {
-            keyAlias keyProperties['keyAlias'] ?: System.getenv('KEY_ALIAS')
-            keyPassword keyProperties['keyPassword'] ?: System.getenv('KEY_PASSWORD')
-            storeFile keyProperties['storeFile'] ? file(keyProperties['storeFile']) : file("qwik-release-key.keystore")
-            storePassword keyProperties['storePassword'] ?: System.getenv('STORE_PASSWORD')
-        }
-    }
-
     defaultConfig {
         applicationId "com.qwik.app"
         minSdk 21
@@ -67,9 +50,10 @@ android {
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            // Uses debug signing — suitable for direct APK install and testing.
+            // For Play Store: replace with a proper keystore signingConfig.
+            signingConfig signingConfigs.debug
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
             signingConfig signingConfigs.debug
