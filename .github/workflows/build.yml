@@ -41,36 +41,7 @@ jobs:
       - name: Run tests
         run: flutter test --no-pub
 
-      - name: Generate release keystore (openssl)
-        run: |
-          # Generate RSA private key
-          openssl genrsa -out /tmp/release.key 2048
-
-          # Self-signed certificate (25 years)
-          openssl req -new -x509 \
-            -key /tmp/release.key \
-            -out /tmp/release.crt \
-            -days 9125 \
-            -subj "/CN=Qwik/O=Qwik/C=BD"
-
-          # Export PKCS12 keystore (compatible with Android signing)
-          openssl pkcs12 -export \
-            -in /tmp/release.crt \
-            -inkey /tmp/release.key \
-            -name qwik \
-            -out android/app/qwik-release-key.keystore \
-            -passout pass:Qwik2024Secure
-
-          echo "✅ Keystore created:"
-          ls -lh android/app/qwik-release-key.keystore
-
-      - name: Write key.properties
-        run: |
-          printf 'storePassword=Qwik2024Secure\nkeyPassword=Qwik2024Secure\nkeyAlias=qwik\nstoreFile=qwik-release-key.keystore\n' \
-            > android/key.properties
-          cat android/key.properties
-
-      - name: Build release APK
+      - name: Build APK
         run: flutter build apk --release
 
       - name: Build App Bundle
@@ -78,7 +49,7 @@ jobs:
 
       - name: Rename outputs
         run: |
-          cp build/app/outputs/flutter-apk/app-release.apk qwik-release.apk
+          cp build/app/outputs/flutter-apk/app-release.apk  qwik-release.apk
           cp build/app/outputs/bundle/release/app-release.aab qwik-release.aab
           ls -lh qwik-release.apk qwik-release.aab
 
@@ -104,19 +75,19 @@ jobs:
             | **qwik-release.aab** | Google Play Store-এ আপলোড করুন |
 
             ### 📱 APK ইনস্টল করার নিয়ম
-            1. `qwik-release.apk` ডাউনলোড করুন
+            1. নিচে থেকে `qwik-release.apk` ডাউনলোড করুন
             2. ফোনে **Settings → Security → Unknown sources** চালু করুন
             3. ডাউনলোড করা ফাইল খুলুন → **Install** করুন
 
             ---
-            Built from: `${{ github.sha }}`
+            Built from commit: `${{ github.sha }}`
           files: |
             qwik-release.apk
             qwik-release.aab
           draft: false
           prerelease: false
 
-      - name: Upload APK artifact
+      - name: Upload APK artifact (backup)
         uses: actions/upload-artifact@v4
         with:
           name: qwik-apk-build${{ github.run_number }}
