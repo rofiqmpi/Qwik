@@ -32,9 +32,6 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Flutter doctor (debug info)
-        run: flutter doctor -v
-
       - name: Accept Android SDK licenses
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || \
@@ -52,10 +49,11 @@ jobs:
 
       - name: Write android/local.properties
         run: |
-          FLUTTER_ROOT=$(flutter --version --machine 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['flutterRoot'])" 2>/dev/null || dirname $(dirname $(which flutter)))
+          FLUTTER_ROOT=$(flutter --version --machine 2>/dev/null \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['flutterRoot'])" 2>/dev/null \
+            || dirname $(dirname $(which flutter)))
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
           echo "sdk.dir=$ANDROID_HOME" >> android/local.properties
-          echo "flutter.buildMode=release" >> android/local.properties
           cat android/local.properties
 
       - name: Analyze
@@ -65,16 +63,12 @@ jobs:
         run: flutter test --no-pub
 
       - name: Build APK (release)
-        run: flutter build apk --release --verbose 2>&1 | tail -50
+        run: flutter build apk --release
 
-      - name: Build App Bundle
-        run: flutter build appbundle --release
-
-      - name: Rename outputs
+      - name: Rename APK
         run: |
-          cp build/app/outputs/flutter-apk/app-release.apk  qwik-release.apk
-          cp build/app/outputs/bundle/release/app-release.aab qwik-release.aab
-          ls -lh qwik-release.apk qwik-release.aab
+          cp build/app/outputs/flutter-apk/app-release.apk qwik-release.apk
+          ls -lh qwik-release.apk
 
       - name: Get version
         id: ver
@@ -92,21 +86,16 @@ jobs:
             ## 📲 Qwik — Android Release Build ${{ github.run_number }}
 
             ### ⬇️ ডাউনলোড করুন
-            | ফাইল | কাজ |
-            |------|-----|
-            | **qwik-release.apk** | সরাসরি Android ফোনে ইনস্টল করুন |
-            | **qwik-release.aab** | Google Play Store-এ আপলোড করুন |
+            **[qwik-release.apk](https://github.com/rofiqmpi/Qwik/releases/latest/download/qwik-release.apk)** — সরাসরি Android ফোনে ইনস্টল করুন
 
-            ### 📱 APK ইনস্টল করার নিয়ম
-            1. নিচে থেকে `qwik-release.apk` ডাউনলোড করুন
+            ### 📱 ইনস্টল করার নিয়ম
+            1. উপরের লিঙ্ক থেকে `qwik-release.apk` ডাউনলোড করুন
             2. ফোনে **Settings → Security → Unknown sources** চালু করুন
             3. ডাউনলোড করা ফাইল খুলুন → **Install** করুন
 
             ---
             Built from commit: `${{ github.sha }}`
-          files: |
-            qwik-release.apk
-            qwik-release.aab
+          files: qwik-release.apk
           draft: false
           prerelease: false
 
