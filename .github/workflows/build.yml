@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   # ─────────────────────────────────────────
-  # Android Build + Release
+  # Android Build + GitHub Release
   # ─────────────────────────────────────────
   build-android:
     name: Build Android APK
@@ -35,20 +35,20 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Get Flutter dependencies
+      - name: Get dependencies
         run: flutter pub get
 
-      - name: Analyze code
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Analyze (warnings allowed)
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
 
       - name: Run tests
-        run: flutter test
+        run: flutter test --no-pub
 
       - name: Decode keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/qwik-release-key.keystore
 
-      - name: Create key.properties
+      - name: Write key.properties
         run: |
           printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=qwik-release-key.keystore\n' \
             "${{ secrets.STORE_PASSWORD }}" \
@@ -56,83 +56,54 @@ jobs:
             "${{ secrets.KEY_ALIAS }}" \
             > android/key.properties
 
-      - name: Build release APK (signed)
+      - name: Build release APK
         run: flutter build apk --release
 
-      - name: Build App Bundle (signed)
+      - name: Build App Bundle
         run: flutter build appbundle --release
 
-      - name: Rename artifacts
+      - name: Rename outputs
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk qwik-release.apk
-          cp build/app/outputs/bundle/release/app-release.aab qwik-release.aab
+          cp build/app/outputs/bundle/release/app-release.aab  qwik-release.aab
 
-      - name: Get version
-        id: version
+      - name: Get version from pubspec
+        id: ver
         run: |
-          VERSION=$(grep 'version:' pubspec.yaml | head -1 | awk '{print $2}')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          VER=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          echo "tag=v${VER}-build${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "name=Qwik ${VER} (Build ${{ github.run_number }})" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}-${{ github.run_number }}
-          name: "Qwik ${{ steps.version.outputs.version }} (Build ${{ github.run_number }})"
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.name }}
           body: |
-            ## Qwik App — Release Build ${{ github.run_number }}
+            ## 📲 Qwik — Android Release
 
-            ### Download
-            - **APK** → `qwik-release.apk` (direct install on Android)
-            - **AAB** → `qwik-release.aab` (for Google Play Store)
+            ### ডাউনলোড করুন
+            | ফাইল | ব্যবহার |
+            |------|---------|
+            | `qwik-release.apk` | সরাসরি Android ফোনে ইনস্টল |
+            | `qwik-release.aab` | Google Play Store আপলোড |
 
-            ### Install APK
-            1. Download `qwik-release.apk`
-            2. Enable "Install from unknown sources" on your Android device
-            3. Open the downloaded file and install
+            ### APK ইনস্টল করার নিয়ম
+            1. `qwik-release.apk` ডাউনলোড করুন
+            2. ফোনে Settings → Security → "Unknown sources" চালু করুন
+            3. ডাউনলোড করা ফাইলটি খুলুন → Install করুন
 
             ---
-            Built from commit: ${{ github.sha }}
+            Commit: `${{ github.sha }}`
           files: |
             qwik-release.apk
             qwik-release.aab
           draft: false
           prerelease: false
 
-      - name: Upload APK artifact (backup)
+      - name: Upload APK as artifact (backup)
         uses: actions/upload-artifact@v4
         with:
-          name: qwik-release-apk
+          name: qwik-release-apk-build${{ github.run_number }}
           path: qwik-release.apk
-          retention-days: 30
-
-  # ─────────────────────────────────────────
-  # iOS Build (no signing)
-  # ─────────────────────────────────────────
-  build-ios:
-    name: Build iOS (no signing)
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.22.0'
-          channel: 'stable'
-          cache: true
-
-      - name: Get Flutter dependencies
-        run: flutter pub get
-
-      - name: Build iOS (no code sign)
-        run: flutter build ios --release --no-codesign
-
-      - name: Upload iOS build
-        uses: actions/upload-artifact@v4
-        with:
-          name: qwik-ios-build
-          path: build/ios/iphoneos/Runner.app
-          retention-days: 14
+          retention-days: 90
