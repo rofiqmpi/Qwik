@@ -41,22 +41,24 @@ jobs:
       - name: Run tests
         run: flutter test --no-pub
 
-      - name: Generate release keystore with keytool
+      - name: Generate release keystore
         run: |
-          keytool -genkeypair \
+          echo "JAVA_HOME=$JAVA_HOME"
+          $JAVA_HOME/bin/keytool -genkeypair \
             -alias qwik \
             -keyalg RSA \
             -keysize 2048 \
             -validity 9125 \
             -keystore android/app/qwik-release-key.keystore \
-            -storepass "Qwik2024Secure" \
-            -keypass "Qwik2024Secure" \
-            -dname "CN=Qwik App, OU=Mobile, O=Qwik, L=Dhaka, ST=Dhaka, C=BD" \
+            -storepass Qwik2024Secure \
+            -keypass Qwik2024Secure \
+            -dname "CN=Qwik,O=Qwik,C=BD" \
             -storetype pkcs12 \
             -noprompt
-          echo "✅ Keystore generated successfully"
-          keytool -list -keystore android/app/qwik-release-key.keystore \
-            -storepass "Qwik2024Secure" -noprompt
+          echo "✅ Keystore OK"
+          $JAVA_HOME/bin/keytool -list \
+            -keystore android/app/qwik-release-key.keystore \
+            -storepass Qwik2024Secure -noprompt
 
       - name: Write key.properties
         run: |
@@ -77,11 +79,6 @@ jobs:
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk qwik-release.apk
           cp build/app/outputs/bundle/release/app-release.aab qwik-release.aab
-
-      - name: Save keystore as artifact (download & store as secret for future)
-        run: |
-          base64 -w 0 android/app/qwik-release-key.keystore > qwik-keystore.b64
-          echo "⚠️ Download 'keystore-backup' artifact and save as KEYSTORE_BASE64 secret for consistent signing"
 
       - name: Get version
         id: ver
@@ -116,13 +113,6 @@ jobs:
             qwik-release.aab
           draft: false
           prerelease: false
-
-      - name: Upload keystore backup
-        uses: actions/upload-artifact@v4
-        with:
-          name: keystore-backup-build${{ github.run_number }}
-          path: qwik-keystore.b64
-          retention-days: 90
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
