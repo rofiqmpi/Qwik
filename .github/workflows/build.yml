@@ -11,9 +11,6 @@ permissions:
   contents: write
 
 jobs:
-  # ─────────────────────────────────────────
-  # Android Build + GitHub Release
-  # ─────────────────────────────────────────
   build-android:
     name: Build Android APK
     runs-on: ubuntu-latest
@@ -38,23 +35,37 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Analyze (warnings allowed)
+      - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
 
       - name: Run tests
         run: flutter test --no-pub
 
-      - name: Decode keystore
+      - name: Generate release keystore with keytool
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/qwik-release-key.keystore
+          keytool -genkeypair \
+            -alias qwik \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 9125 \
+            -keystore android/app/qwik-release-key.keystore \
+            -storepass "Qwik2024Secure" \
+            -keypass "Qwik2024Secure" \
+            -dname "CN=Qwik App, OU=Mobile, O=Qwik, L=Dhaka, ST=Dhaka, C=BD" \
+            -storetype pkcs12 \
+            -noprompt
+          echo "✅ Keystore generated successfully"
+          keytool -list -keystore android/app/qwik-release-key.keystore \
+            -storepass "Qwik2024Secure" -noprompt
 
       - name: Write key.properties
         run: |
-          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=qwik-release-key.keystore\n' \
-            "${{ secrets.STORE_PASSWORD }}" \
-            "${{ secrets.KEY_PASSWORD }}" \
-            "${{ secrets.KEY_ALIAS }}" \
-            > android/key.properties
+          cat > android/key.properties << 'EOF'
+          storePassword=Qwik2024Secure
+          keyPassword=Qwik2024Secure
+          keyAlias=qwik
+          storeFile=qwik-release-key.keystore
+          EOF
 
       - name: Build release APK
         run: flutter build apk --release
@@ -65,9 +76,14 @@ jobs:
       - name: Rename outputs
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk qwik-release.apk
-          cp build/app/outputs/bundle/release/app-release.aab  qwik-release.aab
+          cp build/app/outputs/bundle/release/app-release.aab qwik-release.aab
 
-      - name: Get version from pubspec
+      - name: Save keystore as artifact (download & store as secret for future)
+        run: |
+          base64 -w 0 android/app/qwik-release-key.keystore > qwik-keystore.b64
+          echo "⚠️ Download 'keystore-backup' artifact and save as KEYSTORE_BASE64 secret for consistent signing"
+
+      - name: Get version
         id: ver
         run: |
           VER=$(grep '^version:' pubspec.yaml | awk '{print $2}')
@@ -80,30 +96,37 @@ jobs:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: ${{ steps.ver.outputs.name }}
           body: |
-            ## 📲 Qwik — Android Release
+            ## 📲 Qwik — Android Release Build ${{ github.run_number }}
 
-            ### ডাউনলোড করুন
-            | ফাইল | ব্যবহার |
-            |------|---------|
-            | `qwik-release.apk` | সরাসরি Android ফোনে ইনস্টল |
-            | `qwik-release.aab` | Google Play Store আপলোড |
+            ### ⬇️ ডাউনলোড করুন
+            | ফাইল | কাজ |
+            |------|-----|
+            | **qwik-release.apk** | সরাসরি Android ফোনে ইনস্টল করুন |
+            | **qwik-release.aab** | Google Play Store-এ আপলোড করুন |
 
-            ### APK ইনস্টল করার নিয়ম
+            ### 📱 APK ইনস্টল করার নিয়ম
             1. `qwik-release.apk` ডাউনলোড করুন
-            2. ফোনে Settings → Security → "Unknown sources" চালু করুন
-            3. ডাউনলোড করা ফাইলটি খুলুন → Install করুন
+            2. ফোনে **Settings → Security → Unknown sources** চালু করুন
+            3. ডাউনলোড করা ফাইল খুলুন → **Install** করুন
 
             ---
-            Commit: `${{ github.sha }}`
+            Built from: `${{ github.sha }}`
           files: |
             qwik-release.apk
             qwik-release.aab
           draft: false
           prerelease: false
 
-      - name: Upload APK as artifact (backup)
+      - name: Upload keystore backup
         uses: actions/upload-artifact@v4
         with:
-          name: qwik-release-apk-build${{ github.run_number }}
+          name: keystore-backup-build${{ github.run_number }}
+          path: qwik-keystore.b64
+          retention-days: 90
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwik-apk-build${{ github.run_number }}
           path: qwik-release.apk
           retention-days: 90
