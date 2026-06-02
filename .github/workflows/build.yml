@@ -41,33 +41,34 @@ jobs:
       - name: Run tests
         run: flutter test --no-pub
 
-      - name: Generate release keystore
+      - name: Generate release keystore (openssl)
         run: |
-          echo "JAVA_HOME=$JAVA_HOME"
-          $JAVA_HOME/bin/keytool -genkeypair \
-            -alias qwik \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 9125 \
-            -keystore android/app/qwik-release-key.keystore \
-            -storepass Qwik2024Secure \
-            -keypass Qwik2024Secure \
-            -dname "CN=Qwik,O=Qwik,C=BD" \
-            -storetype pkcs12 \
-            -noprompt
-          echo "✅ Keystore OK"
-          $JAVA_HOME/bin/keytool -list \
-            -keystore android/app/qwik-release-key.keystore \
-            -storepass Qwik2024Secure -noprompt
+          # Generate RSA private key
+          openssl genrsa -out /tmp/release.key 2048
+
+          # Self-signed certificate (25 years)
+          openssl req -new -x509 \
+            -key /tmp/release.key \
+            -out /tmp/release.crt \
+            -days 9125 \
+            -subj "/CN=Qwik/O=Qwik/C=BD"
+
+          # Export PKCS12 keystore (compatible with Android signing)
+          openssl pkcs12 -export \
+            -in /tmp/release.crt \
+            -inkey /tmp/release.key \
+            -name qwik \
+            -out android/app/qwik-release-key.keystore \
+            -passout pass:Qwik2024Secure
+
+          echo "✅ Keystore created:"
+          ls -lh android/app/qwik-release-key.keystore
 
       - name: Write key.properties
         run: |
-          cat > android/key.properties << 'EOF'
-          storePassword=Qwik2024Secure
-          keyPassword=Qwik2024Secure
-          keyAlias=qwik
-          storeFile=qwik-release-key.keystore
-          EOF
+          printf 'storePassword=Qwik2024Secure\nkeyPassword=Qwik2024Secure\nkeyAlias=qwik\nstoreFile=qwik-release-key.keystore\n' \
+            > android/key.properties
+          cat android/key.properties
 
       - name: Build release APK
         run: flutter build apk --release
@@ -79,6 +80,7 @@ jobs:
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk qwik-release.apk
           cp build/app/outputs/bundle/release/app-release.aab qwik-release.aab
+          ls -lh qwik-release.apk qwik-release.aab
 
       - name: Get version
         id: ver
